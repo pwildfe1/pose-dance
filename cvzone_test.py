@@ -6,20 +6,20 @@ import numpy as np
 
 def generate_relative(positions, img):
 
-    pts = positions[:, 0:2]
-    origin = np.array([np.min(pts[:, 0]), np.min(pts[:, 1])])
+    pts = positions[:, 0:2].astype(float)
+    origin = np.array([np.min(pts[:, 0]), np.min(pts[:, 1])]).astype(float)
+    normalized_origin = np.array([origin[0]/img.shape[0], origin[1]/img.shape[1]])
 
-    normalized_origin = np.zeros(origin.shape)
-    normalized_origin[0] = origin[0]/img.shape[0]
-    normalized_origin[1] = origin[1]/img.shape[1]
-    
-    output = np.zeros((pts.shape[0] + 1, pts.shape[1]))
+    bbox_height = (np.max(pts[:, 0]) - np.min(pts[:, 0]))
+    bbox_width = (np.max(pts[:, 1]) - np.min(pts[:, 1]))
+
+    pts[:, 0] = (pts[:, 0] - origin[0])/bbox_height
+    pts[:, 1] = (pts[:, 1] - origin[1])/bbox_width
+
+    output = np.zeros((pts.shape[0] + 2, pts.shape[1]))
     output[0] = normalized_origin
-    pts[:, 0] = pts[:, 0]/img.shape[0]
-    pts[:, 1] = pts[:, 1]/img.shape[1]
-    pts = pts - normalized_origin
-
-    output[1:] = pts
+    output[1] = np.array(bbox_height/img.shape[0], bbox_width/img.shape[1])
+    output[2:] = pts
     
     return output
 
@@ -89,13 +89,6 @@ def main(video_file):
         # Check if any body landmarks are detected
         if lmList:
 
-            # Get the center of the bounding box around the body
-            center = bboxInfo["center"]
-            cv2.circle(img, lmList[0][0:2], 8, (0,255,0), cv2.FILLED)
-
-            # Draw a circle at the center of the bounding box
-            cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)
-
             frames.append(generate_relative(np.array(lmList)[body_indices], img))
 
             # Calculate the distance between landmarks 11 and 15 and draw it on the image
@@ -120,7 +113,6 @@ def main(video_file):
 
             # Display the frame in a window
             name = f'{directory}/frame_' + str(currentframe) + '.jpg'
-            print ('Creating...' + name)
 
             # writing the extracted images 
             cv2.imwrite(name, img)
@@ -132,8 +124,10 @@ def main(video_file):
     
     output = np.zeros((currentframe, frames[0].shape[0], frames[0].shape[1]))
     output[:] = frames
-    print(output.shape) 
+    np.save(f"./input/features/{os.path.splitext(video_file)[0].split('/')[-1]}.npy", output)
 
 
-video = "video/SixStepPeter.mov"
-main(video)
+for file in os.listdir("video"):
+    video = f"video/{file}"
+    main(video)
+    print(file)
